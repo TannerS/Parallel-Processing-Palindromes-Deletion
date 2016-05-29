@@ -92,24 +92,23 @@ int main(int argc, char *argv[])
 		// with null terminator ending each word
 		for (int i = 0; i < list_size; i++)
 		{
+			//mark start of word
+			arr[counter] = '\0';
+			// put null terminator index into list
+			list[i] = counter;
+			// incremenet counter
+			counter++;
+			// loop to get count of the next word
 			for (int j = 0; j < words->at(i).size(); j++)
 			{
 				// get word from vector at i (string is returned)
 				// get char at j from string
 				arr[counter++] = words->at(i).at(j);
 			}
-			// since arr is already incremeneted we should be pointing
-			// at the end of the word so we add the null terminator
-			arr[counter] = '\0';
-			// put null terminator index into list
-			list[i] = counter;
-			// incremenet counter
-			counter++;
 		}
 		// free up memory, this object is no longer used
 		delete words;
 	}
-
 
 
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -139,9 +138,11 @@ int main(int argc, char *argv[])
 	MPI_Bcast(list, list_size, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(arr, arr_size, MPI_CHAR, 0, MPI_COMM_WORLD);
 
-	std::cout << "DEBUG 2,5" << std::endl;
+	MPI_Barrier(MPI_COMM_WORLD);
 
+	
 
+	/*
 	if (myid == 0)
 	{
 		// ****************************DEBUG******************************
@@ -158,15 +159,9 @@ int main(int argc, char *argv[])
 		}
 		//std::cout << std::endl;
 
-	}
+	}*/
 
-
-	std::cout << "DEBUG 3" << std::endl;
-
-	MPI_Barrier(MPI_COMM_WORLD);
-
-
-/*
+	/*
 	if (myid != 0)
 	{
 		std::cout << "DEBUG 4" << std::endl;
@@ -188,6 +183,7 @@ int main(int argc, char *argv[])
 	}
 	*/
 
+	/*
 	if (myid != 0)
 	{
 		std::cout << "PROCESS OTHER" << std::endl;
@@ -197,34 +193,109 @@ int main(int argc, char *argv[])
 		}
 		std::cout <<std::endl;
 	}
-
-	std::cout << "DEBUG 6" << std::endl;
-
-
-	//*************NEEDED OR ELSE SEGMENTATION FAULT
+	*/
+	
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if(myid == 0)
+	markParalindromes(myid, arr_size, list_size, arr, list, numprocs);
+	
+
+
+
+	if (myid == 0)
 	{
 		delete[] arr;
-		delete[] list; 
+		delete[] list;
 	}
 	else
 	{
+		// ********************segmentation fault***********************
 		//lete[] arr;
 		//lete[] list;
 	}
 
 
 
-	std::cout << "DEBUG 7" << std::endl;
-
-
-
-
-
 	MPI_Finalize();
 }
+
+
+bool markParalindromes(int index, int array_size, int list_size, char* words, short* word_indexes, int num_of_processes)
+{
+	/*
+	[0,6,12,17,22]
+
+	p0p1p0p1p0p1
+
+	\0 h e l l o   ->> 1-5
+	\0 w o r l d   ->> 7-11
+	\0 t h i s     ->> 13-16
+	\0 i s         ->> 18-19
+	\0 a           ->> 21-21
+	\0 t e s t     ->> 23-26 -end
+
+	*/
+	// start of word marker
+	int start = -1;
+	// end of word / start of next work markers
+	int end = -1;
+
+
+	for (int i = 0; i < list_size; i += num_of_processes)
+	{
+		// get start of word
+		start = word_indexes[i];
+		//end of word is start of next word NOT INCLUDING this element
+		end = word_indexes[i + 1];
+		// check if current word based off index is a plaindrome or not
+		// this if statement means it is a pliandrome
+		if (checkpalindrome(start, end, words))
+		{
+			// is palinedrome
+
+
+		}
+		else
+		{
+			// is not palinedrome
+
+		}
+
+		
+	}
+}
+
+bool checkpalindrome(int start, int end, char* words)
+{
+	// for example this would mean start = 0
+	// and end = 6
+	// word is 1-5 however
+	// this will start at 0 but we want the enxt one so start+1
+	// since it is < end, the end number, 6 in our exmaple is not included
+	// if using cyclic, we do j += processes
+	// MAY NEEDMORE TESTE FOR CYCLIC
+	for (int j = start + 1, k = end - 1; j < end; j++, k--)
+	{
+		//  0, 1, 2, 3, 4, 5
+		// 0\, h, e, l, l, o
+		// 0\ = 0
+		// o = 5
+		// start = 0
+		// start + 1 = 1
+		// end = 6
+		/*
+		// first example
+		arr[start] == arr[end-1]
+		*/
+		if (words[j] != words[k])
+			// if any single char does not match, it is not a plaindrome
+			return false;
+	}
+	// if loop completes, it means it IS a plaindrome
+	// return true;
+	return true;
+}
+
 
 
 
