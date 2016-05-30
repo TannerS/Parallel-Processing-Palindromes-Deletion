@@ -47,6 +47,11 @@ int main(int argc, char *argv[])
 	// have inorder to send back to root after finding
 	// all none plaindrome words
 	int new_size = 0;
+	// this will be the total size of non-palidrome words
+	// which will be recieved from each process
+	int total_size = 0;
+
+
 	// root does
 	if (myid == 0)
 	{
@@ -160,31 +165,14 @@ int main(int argc, char *argv[])
 	// run function for each process to create a new list of non-palindromes
 	// this is using cyclic partiioning
 	new_words = markParalindromes(myid, arr_size, list_size, arr, list, numprocs, new_size);
+	// barrier
+	MPI_Barrier(MPI_COMM_WORLD);
+	
 
 
-
-	int total_size = 0;
-
-	MPI_Reduce(&new_size, &total_size, numprocs, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-
-	if (myid == 0)
-	{
-
-		std::cout << "SUM: " << std::endl;
-	}
+	std::cout << "NEW SIZE: " << new_size << std::endl;
 
 	/*
-	MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-		void *recvbuf, int recvcount, MPI_INT, 0, MPI_COMM_WORLD)
-	*/
-
-
-
-	// DEBUG*************************************************************************************
-	
-	
-	
 	for (int i = 0; i < new_size; i++)
 	{
 		if (new_words[i] == '\0')
@@ -193,20 +181,69 @@ int main(int argc, char *argv[])
 			std::cout << new_words[i];
 	}
 	std::cout << std::endl;
-	
+*/
+
+	// get number of non-palindromes from each process and sum it up into new var
+	// called total_size, this will be used as a way to keep track oh many chars
+	// words we will be displaying in root
+	MPI_Reduce(&new_size, &total_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
 
 
-	// send list back to root*********************************************************************
+	std::cout << "total SIZE: " << total_size << std::endl;
+	char* temp;
 
 	if (myid == 0)
 	{
+		temp = new char[total_size];
+
+	}
+
+
+	// barrier
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	/*
+	MPI_Gather(
+    void* send_data,
+    int send_count,
+    MPI_Datatype send_datatype,
+    void* recv_data,
+    int recv_count,
+    MPI_Datatype recv_datatype,
+    int root,
+    MPI_Comm communicator)
+	*/
+
+	MPI_Gather(new_words, new_size, MPI_CHAR, temp, total_size, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+	// barrier
+	MPI_Barrier(MPI_COMM_WORLD);
+
+
+	if (myid == 0)
+	{
+		std::cout << "TOTAL SIZE: " << total_size << std::endl;
+
+		
+		for (int i = 0; i < total_size; i++)
+		{
+			if (temp[i] == '\0')
+				std::cout << std::endl;
+			else
+				std::cout << temp[i];
+		}
+		std::cout << std::endl;
+
+
 		if(arr != NULL)
 			delete[] arr;
 		if (list != NULL)
 			delete[] list;
 		if (new_words != NULL)
 			delete[] new_words;
+		if (temp != NULL)
+			delete[] temp;
 	}
 	else
 	{
@@ -260,13 +297,13 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 			// loop this range of the word and add it to new array
 			for (int j = start; j < end; j++)
 			{
-				// increase size which is needed for later
-				// when sending array back to root
+				// increase the number of words
 				new_size++;
-				// set char
+				// put char at pos j into new array at pos k
 				new_words[k++] = words[j];
 				//****assume \0 also gets copied*****
 			}
+
 		}
 	}
 
@@ -275,24 +312,6 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 
 bool checkpalindrome(int start, int end, char* words)
 {
-
-
-
-
-
-	/*
-	for (int i = start; i < end; i++)
-	{
-		if (words[i] == '\0')
-			std::cout << std::endl;
-		else
-			std::cout << words[i];
-	}
-
-*/
-
-
-
 	// for example this would mean start = 0
 	// and end = 6
 	// word is 1-5 however
@@ -322,47 +341,5 @@ bool checkpalindrome(int start, int end, char* words)
 	// if loop completes, it means it IS a plaindrome
 	return true;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
