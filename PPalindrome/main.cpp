@@ -161,10 +161,30 @@ int main(int argc, char *argv[])
 	// this is using cyclic partiioning
 	new_words = markParalindromes(myid, arr_size, list_size, arr, list, numprocs, new_size);
 
-	MPI_Barrier(MPI_COMM_WORLD);
-	std::cout << "*****************************************************************************" << std::endl;
+
+
+	int total_size = 0;
+
+	MPI_Reduce(&new_size, &total_size, numprocs, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+
+	if (myid == 0)
+	{
+
+		std::cout << "SUM: " << std::endl;
+	}
 
 	/*
+	MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+		void *recvbuf, int recvcount, MPI_INT, 0, MPI_COMM_WORLD)
+	*/
+
+
+
+	// DEBUG*************************************************************************************
+	
+	
+	
 	for (int i = 0; i < new_size; i++)
 	{
 		if (new_words[i] == '\0')
@@ -172,7 +192,11 @@ int main(int argc, char *argv[])
 		else
 			std::cout << new_words[i];
 	}
-	*/
+	std::cout << std::endl;
+	
+
+
+
 	// send list back to root*********************************************************************
 
 	if (myid == 0)
@@ -234,16 +258,15 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 		if (!checkpalindrome(start, end, words))
 		{
 			// loop this range of the word and add it to new array
-			for (int i = start; i < end; i++)
+			for (int j = start; j < end; j++)
 			{
 				// increase size which is needed for later
 				// when sending array back to root
 				new_size++;
 				// set char
-				new_words[k++] = words[i];
+				new_words[k++] = words[j];
+				//****assume \0 also gets copied*****
 			}
-			// set null terminator to mark end of word (instead of front like last time)
-			new_words[k++] = '\0';
 		}
 	}
 
@@ -257,7 +280,7 @@ bool checkpalindrome(int start, int end, char* words)
 
 
 
-
+	/*
 	for (int i = start; i < end; i++)
 	{
 		if (words[i] == '\0')
@@ -266,7 +289,7 @@ bool checkpalindrome(int start, int end, char* words)
 			std::cout << words[i];
 	}
 
-
+*/
 
 
 
