@@ -4,7 +4,13 @@
 #include "mpi.h"
 #include <stack>
 #include <vector>
+#include <locale> 
+#include <cstdlib>
+// #include <ctype.h>
+//#include <ctype>
 
+bool checkpalindrome(int, int, char*);
+char* markParalindromes(int, int, int, char*, short*, int, int&);
 
 // argc = cpu count, argv = file.cpp
 int main(int argc, char *argv[])
@@ -35,8 +41,13 @@ int main(int argc, char *argv[])
 	int arr_size = 0;
 	// size of the list
 	int list_size = 0;
-
-
+	// new list of words that are not palindromes
+	char* new_words;
+	// size of new array of words eahc process will
+	// have inorder to send back to root after finding
+	// all none plaindrome words
+	int new_size = 0;
+	// root does
 	if (myid == 0)
 	{
 		// stream to open file
@@ -109,8 +120,7 @@ int main(int argc, char *argv[])
 		// free up memory, this object is no longer used
 		delete words;
 	}
-
-
+	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
 	// broadcast the size of char array and list to other processes
 	// they will be used to allocate the needed space per process
@@ -120,92 +130,48 @@ int main(int argc, char *argv[])
 	// this time only allocate for the other processes
 	if (myid != 0)
 	{
-		std::cout << "DEBUG 1" << std::endl;
 		// allocate list, list should be number of \0
 		// since there is one per word, it should be the number of words
 		list = new short[list_size];
 		// allocate array
 		arr = new char[arr_size];
-		std::cout << "DEBUG 2" << std::endl;
 	}
 	// broadcast array of char (basically all the words
 	// in a char array where each word ends in \0)
 	// also broadcast list of word indexes
-
-	//*************NEEDED OR ELSE SEGMENTATION FAULT
 	MPI_Barrier(MPI_COMM_WORLD);
-
+	// send list of indexes to all processes
 	MPI_Bcast(list, list_size, MPI_INT, 0, MPI_COMM_WORLD);
+	// send array ofwords to processes
 	MPI_Bcast(arr, arr_size, MPI_CHAR, 0, MPI_COMM_WORLD);
-
+	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
+	// run function for each process to create a new list of non-palindromes
+	// this is using cyclic partiioning
+	new_words = markParalindromes(myid, arr_size, list_size, arr, list, numprocs, new_size);
 
-	
 
-	/*
-	if (myid == 0)
-	{
-		// ****************************DEBUG******************************
-		std::cout << "ROOT" << std::endl;
-		for (int i = 0, j = 0; i < arr_size; i++)
-		{
-			if (list[j] == i)
-			{
-				//std::cout << std::endl;
-				j++;
-			}
-			//else
-				//std::cout << arr[i];
-		}
-		//std::cout << std::endl;
-
-	}*/
+	std::cout << "*****************************************************************************" << std::endl;
 
 	/*
-	if (myid != 0)
+	for (int i = 0; i < new_size; i++)
 	{
-		std::cout << "DEBUG 4" << std::endl;
-		std::cout << "ARR SIZE : " << arr_size << " LIST SIZE: " << list_size << std::endl;
-		std::cout << "DEBUG 5" << std::endl;
-
-		std::cout << "PROCESS OTHER" << std::endl;
-		for (int i = 0, j = 0; i < arr_size; i++)
-		{
-			if (list[j] == i)
-			{
-				std::cout << std::endl;
-				j++;
-			}
-			else
-				std::cout << arr[i];
-		}
-		std::cout << std::endl;
+		if (new_words[i] == '\0')
+			std::cout << std::endl;
+		else
+			std::cout << new_words[i];
 	}
 	*/
-
-	/*
-	if (myid != 0)
-	{
-		std::cout << "PROCESS OTHER" << std::endl;
-		for (int i = 0, j = 0; i < list_size; i++)
-		{
-			std::cout << list[i];
-		}
-		std::cout <<std::endl;
-	}
-	*/
-	
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	markParalindromes(myid, arr_size, list_size, arr, list, numprocs);
-	
-
-
+	// send list back to root*********************************************************************
 
 	if (myid == 0)
 	{
-		delete[] arr;
-		delete[] list;
+		if(arr != NULL)
+			delete[] arr;
+		if (list != NULL)
+			delete[] list;
+		if (new_words != NULL)
+			delete[] new_words;
 	}
 	else
 	{
@@ -220,7 +186,7 @@ int main(int argc, char *argv[])
 }
 
 
-bool markParalindromes(int index, int array_size, int list_size, char* words, short* word_indexes, int num_of_processes)
+char* markParalindromes(int index, int array_size, int list_size, char* words, short* word_indexes, int num_of_processes, int& new_size)
 {
 	/*
 	[0,6,12,17,22]
@@ -235,64 +201,84 @@ bool markParalindromes(int index, int array_size, int list_size, char* words, sh
 	\0 t e s t     ->> 23-26 -end
 
 	*/
+
+	// create array of max amount of words
+	// this is worst case where it assumes 
+	// all words are NOT palindrome
+	char* new_words = new char[array_size];
 	// start of word marker
 	int start = -1;
-	// end of word / start of next work markers
+	// end of word/start of next work markers
 	int end = -1;
-
-
-	for (int i = 0; i < list_size; i += num_of_processes)
+	// loop list of when each word starts using cyclic partioning
+	// loop will start at the value from myid and increment by the number 
+	// of processors doing the job
+	for (int i = index, k = 0; i < list_size; i += num_of_processes)
 	{
-		// get start of word
+		// at index of list, getstart of word
 		start = word_indexes[i];
-		//end of word is start of next word NOT INCLUDING this element
+		// end of word is start of next word NOT INCLUDING this element
 		end = word_indexes[i + 1];
 		// check if current word based off index is a plaindrome or not
-		// this if statement means it is a pliandrome
-		if (checkpalindrome(start, end, words))
+		// this is for it not being a palindrome
+		if (!checkpalindrome(start, end, words))
 		{
-			// is palinedrome
-
-
+			for (int j = start + 1; j < end; j++)
+			{
+				new_size++;
+				new_words[k++] =words[j];
+			}
+			new_words[k++] = '\0';
+			new_size++;
 		}
-		else
-		{
-			// is not palinedrome
-
-		}
-
-		
 	}
+
+	return new_words;
 }
 
 bool checkpalindrome(int start, int end, char* words)
 {
+
+	/*
+	for (int i = start; i < end; i++)
+	{
+		if (words[i] == '\0')
+			std::cout << std::endl;
+		else
+			std::cout << words[i];
+	}
+*/
+
+
 	// for example this would mean start = 0
 	// and end = 6
 	// word is 1-5 however
 	// this will start at 0 but we want the enxt one so start+1
 	// since it is < end, the end number, 6 in our exmaple is not included
 	// if using cyclic, we do j += processes
-	// MAY NEEDMORE TESTE FOR CYCLIC
 	for (int j = start + 1, k = end - 1; j < end; j++, k--)
 	{
-		//  0, 1, 2, 3, 4, 5
-		// 0\, h, e, l, l, o
-		// 0\ = 0
-		// o = 5
-		// start = 0
-		// start + 1 = 1
-		// end = 6
-		/*
-		// first example
-		arr[start] == arr[end-1]
-		*/
-		if (words[j] != words[k])
-			// if any single char does not match, it is not a plaindrome
-			return false;
+
+
+
+		// if there is a space at j, increase k
+		// so next loop you can have same letters, except
+		// skipped over the space
+		if (isspace(words[j]))
+			k++;
+		// same as above but opposite
+		else if (isspace(words[k]))
+			j--;
+		// if no spaces
+		else
+		{
+			// check each lowercase of each char to see if they match
+			if ((char)tolower(words[j]) != (char)tolower(words[k]))
+				// if any single char does not match, it is not a plaindrome
+				return false;
+		}
 	}
 	// if loop completes, it means it IS a plaindrome
-	// return true;
 	return true;
 }
 
