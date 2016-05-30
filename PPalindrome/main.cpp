@@ -31,8 +31,8 @@ int main(int argc, char *argv[])
 	// number of processes
 	int n = 0;
 	// display info
-	fprintf(stderr, "process %d on %s\n", myid, processor_name);
-	fflush(stderr);
+	//fprintf(stderr, "process %d on %s\n", myid, processor_name);
+	//fflush(stderr);
 	// declare array to hold char from words plus \0
 	char* arr;
 	// list to keep track of length of each word
@@ -90,6 +90,11 @@ int main(int argc, char *argv[])
 		}
 		// set size depending on word size
 		list_size = words->size();
+		// we added one since later on in the program
+		// we use the next index to mark where the loop stops
+		// without one at end, there is no way to mark the end
+		// and last word never gets processed
+		list_size++;
 		// allocate list, list should be number of \0
 		// since there is one per word, it should be the number of words
 		list = new short[list_size];
@@ -101,7 +106,11 @@ int main(int argc, char *argv[])
 		// loop entier array, while looping each word
 		// and put them sequentially into array
 		// with null terminator ending each word
-		for (int i = 0; i < list_size; i++)
+		// we do list_size-1 since list_size is increased by 1
+		// to fix an earlier problem where we need to mark
+		// last element in list to be able to end it
+		// without it, it crashes, not sure why
+		for (int i = 0; i < list_size-1; i++)
 		{
 			//mark start of word
 			arr[counter] = '\0';
@@ -117,6 +126,8 @@ int main(int argc, char *argv[])
 				arr[counter++] = words->at(i).at(j);
 			}
 		}
+		// make last element to stop loops later in program
+		list[list_size - 1] = counter;
 		// free up memory, this object is no longer used
 		delete words;
 	}
@@ -150,7 +161,7 @@ int main(int argc, char *argv[])
 	// this is using cyclic partiioning
 	new_words = markParalindromes(myid, arr_size, list_size, arr, list, numprocs, new_size);
 
-
+	MPI_Barrier(MPI_COMM_WORLD);
 	std::cout << "*****************************************************************************" << std::endl;
 
 	/*
@@ -199,7 +210,6 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 	\0 i s         ->> 18-19
 	\0 a           ->> 21-21
 	\0 t e s t     ->> 23-26 -end
-
 	*/
 
 	// create array of max amount of words
@@ -223,13 +233,17 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 		// this is for it not being a palindrome
 		if (!checkpalindrome(start, end, words))
 		{
-			for (int j = start + 1; j < end; j++)
+			// loop this range of the word and add it to new array
+			for (int i = start; i < end; i++)
 			{
+				// increase size which is needed for later
+				// when sending array back to root
 				new_size++;
-				new_words[k++] =words[j];
+				// set char
+				new_words[k++] = words[i];
 			}
+			// set null terminator to mark end of word (instead of front like last time)
 			new_words[k++] = '\0';
-			new_size++;
 		}
 	}
 
@@ -239,7 +253,11 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 bool checkpalindrome(int start, int end, char* words)
 {
 
-	/*
+
+
+
+
+
 	for (int i = start; i < end; i++)
 	{
 		if (words[i] == '\0')
@@ -247,7 +265,9 @@ bool checkpalindrome(int start, int end, char* words)
 		else
 			std::cout << words[i];
 	}
-*/
+
+
+
 
 
 	// for example this would mean start = 0
@@ -258,9 +278,6 @@ bool checkpalindrome(int start, int end, char* words)
 	// if using cyclic, we do j += processes
 	for (int j = start + 1, k = end - 1; j < end; j++, k--)
 	{
-
-
-
 		// if there is a space at j, increase k
 		// so next loop you can have same letters, except
 		// skipped over the space
@@ -278,6 +295,7 @@ bool checkpalindrome(int start, int end, char* words)
 				return false;
 		}
 	}
+
 	// if loop completes, it means it IS a plaindrome
 	return true;
 }
