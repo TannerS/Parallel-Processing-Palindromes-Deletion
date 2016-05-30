@@ -95,11 +95,16 @@ int main(int argc, char *argv[])
 		}
 		// set size depending on word size
 		list_size = words->size();
+
+		std::cout << "LIST 1: " << list_size << std::endl;
+
 		// we added one since later on in the program
 		// we use the next index to mark where the loop stops
 		// without one at end, there is no way to mark the end
 		// and last word never gets processed
 		list_size++;
+
+		std::cout << "LIST 2: " << list_size << std::endl;
 	}
 	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -109,7 +114,7 @@ int main(int argc, char *argv[])
 	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
 	// broadcats list size
-	MPI_Bcast(&list_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&list_size, 1, MPI_SHORT, 0, MPI_COMM_WORLD);
 	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
 	// allocate list, list should be number of \0
@@ -160,21 +165,29 @@ int main(int argc, char *argv[])
 	// also broadcast list of word indexes
 	MPI_Barrier(MPI_COMM_WORLD);
 	// send list of indexes to all processes
-	MPI_Bcast(list, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(list, list_size, MPI_SHORT, 0, MPI_COMM_WORLD);//***********************************************crashes if set to anything other than 1
+
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
 	// send array ofwords to processes
-	MPI_Bcast(arr, 1, MPI_CHAR, 0, MPI_COMM_WORLD);
+	MPI_Bcast(arr, arr_size, MPI_CHAR, 0, MPI_COMM_WORLD);
 	// run function for each process to create a new list of non-palindromes
 	// this is using cyclic partiioning
 
 
-/*
+
+
 	new_words = markParalindromes(myid, arr_size, list_size, arr, list, numprocs, new_size);
+		std::cout << "ID : "<< myid << " SIZE: " << new_size << std::endl;
+	
+	
 	// get number of non-palindromes from each process and sum it up into new var
 	// called total_size, this will be used as a way to keep track oh many chars
 	// words we will be displaying in root
 	MPI_Reduce(&new_size, &total_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-
+/*
 	std::cout << "TOTAL SIZE: " << total_size << std::endl;
 
 
@@ -262,16 +275,14 @@ int main(int argc, char *argv[])
 		// clean up
 		if(arr != NULL)
 			delete[] arr;
-		if (list != NULL)
-			delete[] list;
+	//	if (list != NULL)
+		//	delete[] list;
 		//if (new_words != NULL)
 		//	delete[] new_words;
 		//if (temp != NULL)
 			//delete[] temp;
 	}
-
-
-	
+	// needed to clean up 
 	MPI_Finalize();
 }
 
@@ -281,6 +292,40 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 {
 
 	std::cout << "*************PROCESS: " << index << "*******************" << std::endl;
+
+	for (int i = 0; i < list_size;i++)
+	{
+		/*
+		if (words[i] == '\0')
+			std::cout << std::endl;
+		else
+			std::cout << words[i];
+			*/
+
+		std::cout <<word_indexes[i] <<std::endl;
+
+	}
+	std::cout << std::endl;
+
+
+	for (int i = 0; i < array_size;i++)
+	{
+		
+		if (words[i] == '\0')
+		std::cout << std::endl;
+		else
+		std::cout << words[i];
+		
+
+		//std::cout << word_indexes[i] << std::endl;
+
+	}
+	std::cout << std::endl;
+
+
+
+
+
 	/*
 	[0,6,12,17,22]
 	p0p1p0p1p0p1
@@ -313,7 +358,7 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 		// this is for it not being a palindrome
 
 		//
-
+		/*
 		if (!checkpalindrome(start, end, words))
 		{
 			// loop this range of the word and add it to new array
@@ -325,7 +370,7 @@ char* markParalindromes(int index, int array_size, int list_size, char* words, s
 				new_words[k++] = words[j];
 				//****assume \0 also gets copied*****
 			}
-		}
+		}*/
 	}
 
 	return new_words;
