@@ -29,6 +29,15 @@ int main(int argc, char *argv[])
 	MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
 	//each process gets its own id
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+	// needed for times
+	double program_start = 0;
+	double program_end = 0;
+	double process_start = 0;
+	double process_end = 0;
+	// take time
+	if (myid == 0)
+		// get start program time
+		program_start = MPI_Wtime();
 	// Gets the name of the processor
 	MPI_Get_processor_name(processor_name, &namelen);
 	// number of processes
@@ -106,6 +115,10 @@ int main(int argc, char *argv[])
 		// and last word never gets processed
 		list_size++;
 	}
+	// take time
+	if (myid == 0)
+		// get start program time
+		process_start = MPI_Wtime();
 	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
 	// broadcast the size of char array and list to other processes
@@ -213,6 +226,9 @@ int main(int argc, char *argv[])
 	MPI_Win_unlock(1, win);
 	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
+	if (myid == 0)
+		// get start program time
+		process_end = MPI_Wtime();
 	// clean up and display results
 	if (myid == 0)
 	{
@@ -224,7 +240,18 @@ int main(int argc, char *argv[])
 		if (new_words != NULL)
 			delete[] new_words;
 	}
-
+	// barrier
+	MPI_Barrier(MPI_COMM_WORLD);
+	if (myid == 0)
+		// get start program time
+		program_end = MPI_Wtime();
+	if(myid == 0)
+	{ 
+		// get total time
+		std::cout << "Program Time: " << (program_end - program_start) << "s" << std::endl;
+		// get processe stime
+		std::cout << "Process Time: " << (process_end - process_start) << "s" << std::endl;
+	}
 	// needed to clean up 
 	MPI_Win_free(&win);
 	MPI_Finalize();
