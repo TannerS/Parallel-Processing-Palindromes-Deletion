@@ -15,6 +15,13 @@ char* markParalindromes(int, int, int, char*, short*, int, int&);
 // argc = cpu count, argv = file.cpp
 int main(int argc, char *argv[])
 {
+
+	MPI_Win win;
+
+
+
+
+
 	int namelen = 0;
 	int myid, numprocs = 0;
 	// processor name
@@ -33,6 +40,18 @@ int main(int argc, char *argv[])
 	// display info
 	fprintf(stderr, "process %d on %s\n", myid, processor_name);
 	fflush(stderr);
+
+
+
+
+	MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &win);
+
+
+
+
+
+
+
 	// declare array to hold char from words plus \0
 	char* arr;
 	// list to keep track of length of each word
@@ -170,12 +189,34 @@ int main(int argc, char *argv[])
 	// called total_size, this will be used as a way to keep track oh many chars
 	// words we will be displaying in root
 
+	MPI_Win_lock(MPI_LOCK_SHARED, 1, 0, win);
+
+	std::fstream out;
+	out.open("test.txt", std::ios::out | std::ios::app);
+
+	for (int i = 0; i < new_size; i++)
+	{
+		if (new_words[i] == '\0')
+		{
+			std::cout << "TEST!!" << std::endl;
+			out << '0D';
+			out << '0A';
+		}
+		else
+			out << new_words[i];
+	}
+	out << '0D';
+	out << '0A';
+
+	MPI_Win_unlock(1, win);
+
+	//MPI_Reduce(&new_size, &total_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
 
-	std::cout << "ID: " << myid << " SIZE: " << new_size << std::endl;
-	MPI_Reduce(&new_size, &total_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
 
+
+	/*
 	if (myid == 0)
 		std::cout << "TOTALSIZE: " << total_size << std::endl;
 
@@ -193,45 +234,59 @@ int main(int argc, char *argv[])
 	}
 	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
+
+
+	int count = 0;
+
+
 	// all non root processes do this
 	if (myid != 0)
 	{
+		std::cout << "SEND: " << myid << std::endl;
 		// have all processes send thier arra y size
 		MPI_Send(&new_size, 1, MPI_INT, 0, myid, MPI_COMM_WORLD);
-	}
-	else
-	{
+	//}
+	//else
+	//{
+		//std::cout << "RECEIVER: " << myid << std::endl;
+		MPI_Barrier(MPI_COMM_WORLD);
 		// put root size into arry
-		size_arr[0] = new_size;
+		//size_arr[0] = new_size;
 		// loop other processes sizes
-		for (int i = 1; i < numprocs; i++)
+
+
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		for (int i = 0; i < numprocs; i++)
 		{
+
 			// receive sizes from process i
-			MPI_Recv(&temp_size, 1, MPI_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(&temp_size, 1, MPI_INT, myid, myid, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			// put size into array
 			size_arr[i] = temp_size;
 		}
-	}
 
+	//}
 
+	std::cout << "END: " << myid << std::endl;
 	// barrier
-	MPI_Barrier(MPI_COMM_WORLD);
+	//MPI_Barrier(MPI_COMM_WORLD);
 
 
 	if (myid == 0) 
 	{
-		//std::cout << "DEBUG: " << std::endl;
-		//for (int i = 0; i < numprocs; i++)
-			//std::cout << size_arr[i] << std::endl;
+		std::cout << "DEBUG: " << std::endl;
+		for (int i = 0; i < numprocs; i++)
+			std::cout << size_arr[i] << std::endl;
 	}
 
 
 
 	// barrier
-	MPI_Barrier(MPI_COMM_WORLD);
+	//MPI_Barrier(MPI_COMM_WORLD);
 	// all non root processes do this
-	//if (myid != 0)
-	//{
+	if (myid != 0)
+	{
 		/*
 		std::cout << "DEBUG at : " << myid  << " Size : " << new_size << std::endl;
 
@@ -244,13 +299,19 @@ int main(int argc, char *argv[])
 		}
 
 		std::cout << std::endl;
-		*/
+		
 
-	MPI_Barrier(MPI_COMM_WORLD);
-		std::cout << "ID: " << myid << std::endl;
-		MPI_Barrier(MPI_COMM_WORLD);
+		// have all processes send thier arra y size
+
+
+		// barrier
+		//MPI_Barrier(MPI_COMM_WORLD);
+		//std::cout << "ID: " << myid << std::endl;
+
 		MPI_Send(new_words, new_size, MPI_CHAR, 0, myid, MPI_COMM_WORLD);
-	//}
+	}
+
+
 	/*
 	else if (myid == 0)
 	{
@@ -267,9 +328,11 @@ int main(int argc, char *argv[])
 		std::cout << std::endl;
 
 	}
-	*/
-	//else
-	if(myid != 0)
+	
+
+
+
+	else
 	{
 		
 		// temp counter to keep track of results array
@@ -278,6 +341,16 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < new_size; i++)
 			temp[counter++] = new_words[i];
 
+		
+		for (int i = 0; i < new_size; i++)
+		{
+			if (new_words[i] == '\0')
+				std::cout << std::endl;
+			else
+				std::cout << new_words[i];
+			std::cout << std::endl;
+		}
+		
 
 		char* test;
 
@@ -286,21 +359,21 @@ int main(int argc, char *argv[])
 		{
 			test = new char[size_arr[i]];
 
-			//std::cout << "!!!!!!!!!!!" << std::endl;
+			std::cout << "!!!!!!!!!!!: ID: "<< myid << std::endl;
 
 			// receive sizes from process i
 			//		MPI_Send(new_words, new_size, MPI_CHAR, 0, myid, MPI_COMM_WORLD);
 			MPI_Recv(&test, size_arr[i], MPI_CHAR, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-			//std::cout <<"RESULTS " << std::endl;
+			std::cout <<"RESULTS " << myid<< std::endl;
 
 			
 			for (int j = 0; j < size_arr[i]; j++)
 			{
 				
 				if (test[j] == '\0')
-					std::cout << std::endl;
-				else
+				std::cout << std::endl;
+			else
 					std::cout << test[j];
 				std::cout << std::endl;
 			}
@@ -311,11 +384,15 @@ int main(int argc, char *argv[])
 			for (int j = 0; j < size_arr[i]; j++)
 			{
 				temp[counter++] = arr[j];
-			}*/
+			}
 
 			delete[] test;
 		}
 	}
+
+
+	*/
+
 	// barrier
 	MPI_Barrier(MPI_COMM_WORLD);
 	// clean up and display results
@@ -324,16 +401,6 @@ int main(int argc, char *argv[])
 
 	if (myid == 0)
 	{
-		
-		// display results
-		for (int i = 0; i < total_size; i++)
-		{
-			//if (temp[i] == '\0')
-			//	std::cout << std::endl;
-			//else
-			//	std::cout << temp[i];
-		}
-		
 		// clean up
 		if(arr != NULL)
 			delete[] arr;
@@ -341,10 +408,12 @@ int main(int argc, char *argv[])
 			delete[] list;
 		if (new_words != NULL)
 			delete[] new_words;
-		if (temp != NULL)
-			delete[] temp;
+		//if (temp != NULL)
+			//delete[] temp;
 	}
+
 	// needed to clean up 
+	MPI_Win_free(&win);
 	MPI_Finalize();
 }
 
